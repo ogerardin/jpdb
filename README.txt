@@ -1,3 +1,9 @@
+Note: this project was made in 2005, as Palm was all the hype in what was then called "handheld computing". I'm just
+putting it here as an archive, and who knows if it could be of any use.
+I just "mavenized" the project so it would build easily, everything else is as it was back in the days. Of course
+the "package contents" section below doesn't apply anymore.
+
+
 
 				JPDB, a Java library to read/write Palm OS file formats
 
