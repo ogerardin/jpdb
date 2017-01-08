@@ -1,0 +1,210 @@
+<html>
+	<head>
+		<title>Untitled Document</title>
+		<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+	</head>
+	<body text="#000000" bgColor="#ffffff">
+		<p>JPDB is a Java library intended to facilitate reading and writing of Palm 
+			database file formats.</p>
+		<h1>Usage</h1>
+		<h2>Overview</h2>
+		<p>A Palm OS database file is represented by a {@link oge.jpdb.PalmDatabase}</CODE> 
+			object. The <code>PalmDatabase</code> class provides access to:</p>
+		<ul>
+			<li>
+				the&nbsp;set of properties of the database file, including:
+				<ul>
+					<li>
+					string properties (name, creator, type)
+					<li>
+					numeric properties (version, unique ID seed)
+					<li>
+					date properties (creation, modification, last access)
+					<li>
+						boolean properties (read-only, backup, ...)
+					</li>
+				</ul>
+			<li>
+			the two special blocks named AppInfo block and SortInfo block that contain 
+			application-specific data
+			<li>
+				a list of {@link oge.jpdb.RecordEntry} objects, each representing a record or 
+				resource in the database file.<br>
+			</li>
+		</ul>
+		<p>The properties exposed by PalmDatabase have the same name and purpose as 
+			corresponding database header fields,&nbsp;as described in the "Palm OS File 
+			Format Specification" document from PalmSource. Note that creator and type are <code>
+				UInt32</code> fields, but are exposed as 4-character strings for 
+			convenience.</p>
+		<p><code>PalmDatabase</code> is an abstract class; a <code>PalmDatabase</code> can 
+			be either
+		</p>
+		<ul>
+			<li>
+			a {@link oge.jpdb.PrcFile}, representing a PRC file, or
+			<li>
+				a {@link oge.jpdb.PdbFile}, representing a PDB file
+			</li>
+		</ul>
+		<p>The only difference between these types is that:</p>
+		<ul>
+			<li>
+				a <code>PrcFile</code>
+			contains records of type {@link oge.jpdb.PrcRecordEntry}, while
+			<li>
+				a <code>PdbFile</code> contains records of type {@link oge.jpdb.PdbRecordEntry}
+			</li>
+		</ul>
+		<p>Both types of records provide access to "raw data", i.e. the actual record's 
+			contents, in the form of a byte array. They differ in the following way:
+		</p>
+		<ul>
+			<li>
+				a <code>PrcRecordEntry</code>
+			has a type (32-bit integer), and an ID&nbsp;(16-bit integer); its contents are 
+			a binary "resource", that is a bitmap, a form definition, a string, machine 
+			code, or anything that may be necessary to run a program. Note: In its current 
+			state, JPDB does not provide methods to interpret a binary resource.
+			<li>
+				a <code>PdbRecordEntry</code> has some boolean attributes, and a unique 
+				ID&nbsp;(32-bit integer); its contents are totaly free and depend entirely on 
+				the application that will use it.
+			</li>
+		</ul>
+		<p>&nbsp;</p>
+		<h2>Creating databases</h2>
+		<p>To manipulate a palm database, you need to obtain a reference to an instance of 
+			either a <code>PdbFile</code> or <code>PrcFile</code>:</p>
+		<ul>
+			<li>
+			If you intend to create the database from scratch, invoke the parameterless 
+			constructor: {@link oge.jpdb.PdbFile#PdbFile() new PdbFile()} or {@link 
+			oge.jpdb.PrcFile#PrcFile() new PrcFile()}
+			<li>
+				If the database file already exists and you want to read it, invoke the 
+				constructor that takes a <code>File</code> argument: {@link 
+				oge.jpdb.PdbFile#PdbFile(File) new PdbFile(file)} or <code>new PrcFile(file)</code>
+			<li>
+				Alternately, if you don't know whether the file to open is a PDB or a PRC, you 
+				can use the convenience method {@link oge.jpdb.PalmDatabase#open(File) 
+				PalmDatabase.open(file)}. This method will try to open the file as a PDB, then 
+				if it fails as a PRC, and return a reference to either a <code>PdbFile</code> or
+				<code>PrcFile</code>.You can then check the actual type of the returned <code>PalmDatabase</code>
+				using <code>getClass()</code> or <code>instanceof</code>, or by checking the 
+				resourceDb property.
+			</li>
+		</ul>
+		<p>When you create a <code>PalmDatabase</code> from an existing file, the database 
+			header (containing the properties) and the record entry table (only the 
+			entries, not the data) are immediately read from the underlying file and 
+			parsed, so that access to the database properties does not require disk access.
+		</p>
+		<p>When you create a <code>PalmDatabase</code> from scratch, its properties have 
+			default values, and the record entry list is empty.</p>
+		<h2>Accessing records</h2>
+		<p>Individual records are accessed in the following way:</p>
+		<ul>
+			<li>
+				calling {@link oge.jpdb.PalmDatabase#getRecordEntry(int)} gives you access to 
+				the corresponding <code>RecordEntry</code>. Depending on whether the 
+				PalmDatabase is a PdbFile or a PrcFile, this method will return respectively a <code>
+					PdbRecordEntry</code> or a <code>PrcRecordEntry</code>.
+			<li>
+				calling {@link oge.jpdb.PalmDatabase#getRecordBytes(int)} gives you access to 
+				the record's raw data (the record's contents). Record data is always returned 
+				or set as a byte array, it's up to you to interpret it correctly. In 
+				particular, how the bytes of a <code>PrcRecordEntry</code> are interpreted 
+				depend on the type of the record, as returned by {@link 
+				oge.jpdb.PrcRecordEntry#getType()}.
+			</li>
+		</ul>
+		<p>Raw record data is normally not read from the underlying file until you call 
+			{@link oge.jpdb.PalmDatabase#getRecordBytes(int)}. Once a record's raw data has 
+			been read, it is cached and subsequent calls to <code>getRecordBytes(int)</code>
+			for the same record will not require disk access. If you need to make sure that 
+			no further disk access is made, you may call {@link 
+			oge.jpdb.PalmDatabase#loadAllRecords()} before using <code>getRecordBytes(int)</code>. 
+			Note: <code>getRecordEntry(n).getRawData()</code> is not equivalent to <code>getRecordBytes(n)</code>; 
+			in the first case the raw data will not be fetched if it has not been loaded 
+			yet, and <code>null</code> will be return.</p>
+		<p>Whether the PalmDatabase has been loaded from a file or not, you may at any time 
+			add records to it or remove records from it:</p>
+		<ul>
+			<li>
+				to add a record, instantiate a <code>PdbRecordEntry</code> or <code>PrcRecordEntry</code>, 
+			set its attributes and contents, and call {@link 
+			oge.jpdb.PalmDatabase#addRecord(int, RecordEntry)} or {@link 
+			oge.jpdb.PalmDatabase#addRecord(RecordEntry)}
+			<li>
+				to remove a record, call {@link oge.jpdb.PalmDatabase#removeRecord(int)}
+			</li>
+		</ul>
+		<h2>Saving a database</h2>
+		<p>Once you are satisfied with the state of your <code>PalmDatabase</code>, you may 
+			save it to a file by calling {@link oge.jpdb.PalmDatabase#writeTo(File)}. 
+			Before writing anything, if the database was created from a file, this method 
+			ensures that all record raw data has been read from the underlying file. It 
+			thens writes the database header, the record table, and the record data for the 
+			new database.</p>
+		<p>&nbsp;</p>
+		<h1>Code samples</h1>
+		<p>The following code sample shows how simple it is to create a PDB file from 
+			scratch:</p>
+		<blockquote>
+			<p><code>// Instantiate a PdbFile<br>
+					PdbFile pdbFile = new PdbFile();<br>
+				</code>
+			</p>
+			<p><code>// Set some properties<br>
+					pdbFile.setName("My database");<br>
+					pdbFile.setCreator("ABCD");<br>
+					pdbFile.setType("DATA");<br>
+				</code>
+			</p>
+			<p><code>// Add records<br>
+					byte[] data = new byte[] { 1, 2, 3, 4, 5, 9, 8, 7, 6, 0 };<br>
+				</code><code>PdbRecordEntry entry = new PdbRecordEntry(data);<br>
+					pdbFile.addRecord(entry);<br>
+				</code>
+			</p>
+			<p><code>// Write to a file<br>
+					pdbFile.writeTo(new File("myfile.pdb"));</code></p>
+		</blockquote>
+		<p>You can create a PRC file in the same fashion:</p>
+		<blockquote>
+			<p><code>// Instantiate a PrcFile</code><code><br>
+					PrcFile prcFile = new PrcFile();</code></p>
+			<p><code>// Set some properties<br>
+					prcFile.setName("My resources");<br>
+					prcFile.setCreator("ABCD");<br>
+					prcFile.setType("rsrc");</code></p>
+			<p><code>// Add resources<br>
+					byte[] data = new byte[] { 0x31, 0x2e, 0x30, 0x00 };<br>
+					PrcRecordEntry entry = new PrcRecordEntry("tver", (short) 1000, data);<br>
+					prcFile.addRecord(entry);</code></p>
+			<p><code>// Write to a file<br>
+					prcFile.writeTo(new File("myfile.prc"));</code></p>
+		</blockquote>
+		<p>Reading a palm database is as easy:</p>
+		<blockquote>
+			<p><code>// Instantiate a PDB file from an existing file<br>
+					PdbFile pdbFile = new PdbFile(new File("test.pdb"));<br>
+				</code>
+			</p>
+			<p><code>// Retrieve some properties of the database<br>
+					String name = pdbFile.getName();<br>
+					String creator = pdbFile.getCreator();<br>
+					String type = pdbFile.getType();</code></p>
+			<p><code>// Iterate through records<br>
+					for (int i = 0; i &lt; pdbFile.getRecordCount(); i++) {</code></p>
+			<blockquote>
+				<p><code>PdbRecordEntry recordEntry = (PdbRecordEntry) pdbFile.getRecordEntry(i);<br>
+						byte[] data = pdbFile.getRecordBytes(i);<br>
+					</code><code>// Do something with it...</code></p>
+			</blockquote>
+			<p><code>}</code></p>
+		</blockquote>
+		<p>&nbsp;</p>
+	</body>
+</html>
